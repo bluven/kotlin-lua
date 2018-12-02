@@ -2,6 +2,10 @@ package lua
 
 import lua.binchunk.undump
 import lua.binchunk.Prototype
+import lua.vm.Instruction
+import lua.vm.OpCode
+import lua.vm.OpArgMask.*
+import lua.vm.OpMode.*
 
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -45,9 +49,49 @@ private fun printHeader(f: Prototype) {
 }
 
 private fun printCode(f: Prototype) {
-    for (i in f.code.indices) {
+
+    f.code.forEachIndexed { i, code ->
+
         val line = if (f.lineInfo.isNotEmpty()) f.lineInfo[i].toString() else "-"
-        System.out.printf("\t%d\t[%s]\t0x%08X\n", i + 1, line, f.code[i])
+        val inst = Instruction(code)
+
+        System.out.printf("\t%d\t[%s]\t%-8s \t", i + 1, line, inst.opCode)
+//        print("\t${i+1}\t[$line]\t${inst.opCode}")
+        printOperands(inst)
+        println()
+    }
+}
+
+private fun printOperands(i: Instruction) {
+    val opCode = i.opCode
+    val a = i.a
+    when (opCode.opMode) {
+        iABC -> {
+            System.out.printf("%d", a)
+            if (opCode.argBMode !== OpArgN) {
+                val b = i.b
+                System.out.printf(" %d", if (b > 0xFF) -1 - (b and 0xFF) else b)
+            }
+            if (opCode.argCMode !== OpArgN) {
+                val c = i.c
+                System.out.printf(" %d", if (c > 0xFF) -1 - (c and 0xFF) else c)
+            }
+        }
+        iABx -> {
+            System.out.printf("%d", a)
+            val bx = i.bx
+            if (opCode.argBMode === OpArgK) {
+                System.out.printf(" %d", -1 - bx)
+            } else if (opCode.argBMode === OpArgU) {
+                System.out.printf(" %d", bx)
+            }
+        }
+        iAsBx -> {
+            System.out.printf("%d %d", a, i.sBx)
+        }
+        iAx -> {
+            System.out.printf("%d", -1 - i.ax)
+        }
     }
 }
 
