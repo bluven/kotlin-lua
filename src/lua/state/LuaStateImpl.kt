@@ -1,8 +1,12 @@
 package lua.state
 
+import lua.api.LuaState
+import lua.api.ArithOp
+import lua.api.ArithOp.*
+import lua.api.CmpOp
+import lua.api.CmpOp.*
 import lua.api.LuaType
 import lua.api.LuaType.*
-import lua.api.LuaState
 
 class LuaStateImpl : LuaState {
 
@@ -168,6 +172,67 @@ class LuaStateImpl : LuaState {
 
     override fun pushString(s: String) {
         stack.push(s)
+    }
+
+    override fun arith(op: ArithOp) {
+        val b = stack.pop()
+        val a = if (op != LUA_OPUNM && op != LUA_OPBNOT) {
+            stack.pop()
+        } else {
+            b
+        }
+
+        val result = arith(a, b, op)
+        if (result != null) {
+            stack.push(result)
+        } else {
+            throw Exception("arithmetic error!")
+        }
+    }
+
+    override fun compare(idx1: Int, idx2: Int, op: CmpOp): Boolean {
+        if (!stack.isValid(idx1) || !stack.isValid(idx2)) {
+            return false
+        }
+
+        val a = stack.get(idx1)
+        val b = stack.get(idx2)
+
+        return when (op) {
+            LUA_OPEQ -> eq(a, b)
+            LUA_OPLT -> lt(a!!, b!!)
+            LUA_OPLE -> le(a!!, b!!)
+        }
+    }
+
+    override fun len(idx: Int) {
+        val value = stack.get(idx)
+
+        if (value is String) {
+            pushInteger(value.length.toLong())
+        } else {
+            throw Exception("length error!")
+        }
+    }
+
+    override fun concat(n: Int) {
+        if (n == 0) {
+            stack.push("")
+        } else if (n >= 2) {
+
+            repeat(n - 1) {
+                if (!isString(-1) || !isString(-2)) {
+                    throw Exception("concatenation error!")
+                }
+
+                val s2 = toString(-1)
+                val s1 = toString(-2)
+                pop(2)
+                pushString(s1 + s2)
+            }
+        }
+
+        // n == 1, do nothing
     }
 
 }

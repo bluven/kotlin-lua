@@ -16,7 +16,7 @@ internal class LuaStack {
         slots.add(value)
     }
 
-    fun pop() = slots.remove(slots.lastIndex)
+    fun pop() = slots.removeAt(slots.lastIndex)
 
     fun absIndex(idx: Int) = if (idx >= 0) idx else idx + top + 1
 

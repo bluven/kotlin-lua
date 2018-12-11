@@ -40,5 +40,11 @@ interface LuaState {
     fun pushInteger(n: Long)
     fun pushNumber(n: Double)
     fun pushString(s: String)
-}
 
+    fun arith(op: ArithOp)
+    fun compare(idx1: Int, idx2: Int, op: CmpOp): Boolean
+
+    /* miscellaneous functions */
+    fun len(idx: Int)
+    fun concat(n: Int)
+}
