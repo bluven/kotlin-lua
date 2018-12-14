@@ -1,16 +1,18 @@
 package lua.state
 
-import lua.api.LuaState
+import lua.api.LuaVM
 import lua.api.ArithOp
 import lua.api.ArithOp.*
 import lua.api.CmpOp
 import lua.api.CmpOp.*
 import lua.api.LuaType
 import lua.api.LuaType.*
+import lua.binchunk.Prototype
 
-class LuaStateImpl : LuaState {
+class LuaStateImpl(val proto: Prototype) : LuaVM {
 
     private val stack = LuaStack()
+    private var pc = 0
 
     /* basic stack manipulation */
 
@@ -130,7 +132,7 @@ class LuaStateImpl : LuaState {
         return if (value is Long) value else null
     }
 
-    override fun toNumber(idx: Int) = toNumberX(idx) ?: 0 as Double
+    override fun toNumber(idx: Int) = toNumberX(idx) ?: 0.toDouble()
 
     override fun toNumberX(idx: Int): Double? {
         val value = stack.get(idx)
@@ -233,6 +235,31 @@ class LuaStateImpl : LuaState {
         }
 
         // n == 1, do nothing
+    }
+
+    /* LuaVM */
+    override fun getPC(): Int {
+        return pc
+    }
+
+    override fun addPC(n: Int) {
+        pc += n
+    }
+
+    override fun fetch(): Int {
+        return proto.code[pc++]
+    }
+
+    override fun getConst(idx: Int) {
+        stack.push(proto.constants[idx])
+    }
+
+    override fun getRK(rk: Int) {
+        if (rk > 0xFF) { // constant
+            getConst(rk and 0xFF)
+        } else { // register
+            pushValue(rk + 1)
+        }
     }
 
 }

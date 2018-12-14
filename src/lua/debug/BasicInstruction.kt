@@ -1,36 +1,38 @@
 package lua.debug
 
-import lua.api.LuaState
-import lua.api.LuaType.*
-import lua.state.LuaStateImpl
-import lua.binchunk.undump
-
 import java.nio.file.Files
 import java.nio.file.Paths
+import lua.binchunk.undump
+import lua.binchunk.Prototype
+import lua.state.LuaStateImpl
+import lua.api.LuaState
+import lua.api.LuaType.*
+import lua.vm.Instruction
+import lua.vm.OpCode
 
-fun testLuaState(path: String) {
+fun testBasicInstructions(path: String) {
     val data = Files.readAllBytes(Paths.get(path))
     val proto = undump(data)
-    val ls = LuaStateImpl(proto)
+    luaMain(proto)
+}
 
-    ls.pushBoolean(true)
-    printStack(ls)
-    ls.pushInteger(10)
-    printStack(ls)
-    ls.pushNil()
-    printStack(ls)
-    ls.pushString("hello")
-    printStack(ls)
-    ls.pushValue(-4)
-    printStack(ls)
-    ls.replace(3)
-    printStack(ls)
-    ls.top = 6
-    printStack(ls)
-    ls.remove(-3)
-    printStack(ls)
-    ls.top = -5
-    printStack(ls)
+private fun luaMain(proto: Prototype) {
+    val vm = LuaStateImpl(proto)
+    vm.top = proto.maxStackSize.toInt()
+
+    while (true) {
+        val pc = vm.getPC()
+        val i = Instruction(vm.fetch())
+        val opCode = i.opCode
+        if (opCode !== OpCode.RETURN) {
+            opCode.action?.invoke(i, vm)
+
+            System.out.printf("[%02d] %-8s ", pc + 1, opCode.name)
+            printStack(vm)
+        } else {
+            break
+        }
+    }
 }
 
 private fun printStack(ls: LuaState) {

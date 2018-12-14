@@ -5,9 +5,16 @@ import lua.api.LuaType.*
 import lua.api.ArithOp.*
 import lua.api.CmpOp.*
 import lua.state.LuaStateImpl
+import lua.binchunk.undump
 
-fun testOp() {
-    val ls = LuaStateImpl()
+import java.nio.file.Files
+import java.nio.file.Paths
+
+fun testOp(path: String) {
+    val data = Files.readAllBytes(Paths.get(path))
+    val proto = undump(data)
+    val ls = LuaStateImpl(proto)
+
     ls.pushInteger(1)
     ls.pushString("2.0")
     ls.pushString("3.0")
