@@ -36,11 +36,11 @@ enum class OpCode(
     LOADNIL (0, 1, OpArgU, OpArgN, iABC, ::loadNil), // R(A), R(A+1), ..., R(A+B) := nil
     GETUPVAL(0, 1, OpArgU, OpArgN, iABC), // R(A) := UpValue[B]
     GETTABUP(0, 1, OpArgU, OpArgK, iABC), // R(A) := UpValue[B][RK(C)]
-    GETTABLE(0, 1, OpArgR, OpArgK, iABC ), // R(A) := R(B)[RK(C)]
+    GETTABLE(0, 1, OpArgR, OpArgK, iABC, ::getTable), // R(A) := R(B)[RK(C)]
     SETTABUP(0, 0, OpArgK, OpArgK, iABC ), // UpValue[A][RK(B)] := RK(C)
     SETUPVAL(0, 0, OpArgU, OpArgN, iABC ), // UpValue[B] := R(A)
-    SETTABLE(0, 0, OpArgK, OpArgK, iABC ), // R(A)[RK(B)] := RK(C)
-    NEWTABLE(0, 1, OpArgU, OpArgU, iABC ), // R(A) := {} (size = B,C)
+    SETTABLE(0, 0, OpArgK, OpArgK, iABC, ::setTable), // R(A)[RK(B)] := RK(C)
+    NEWTABLE(0, 1, OpArgU, OpArgU, iABC, ::newTable), // R(A) := {} (size = B,C)
     SELF    (0, 1, OpArgR, OpArgK, iABC ), // R(A+1) := R(B); R(A) := R(B)[RK(C)]
     ADD     (0, 1, OpArgK, OpArgK, iABC, ::add), // R(A) := RK(B) + RK(C)
     SUB     (0, 1, OpArgK, OpArgK, iABC, ::sub), // R(A) := RK(B) - RK(C)
@@ -72,7 +72,7 @@ enum class OpCode(
     FORPREP (0, 1, OpArgR, OpArgN, iAsBx, ::forPrep), // R(A)-=R(A+2); pc+=sBx
     TFORCALL(0, 0, OpArgN, OpArgU, iABC ), // R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2));
     TFORLOOP(0, 1, OpArgR, OpArgN, iAsBx), // if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }
-    SETLIST (0, 0, OpArgU, OpArgU, iABC ), // R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
+    SETLIST (0, 0, OpArgU, OpArgU, iABC, ::setList), // R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
     CLOSURE (0, 1, OpArgU, OpArgN, iABx ), // R(A) := closure(KPROTO[Bx])
     VARARG  (0, 1, OpArgU, OpArgN, iABC ), // R(A), R(A+1), ..., R(A+B-2) = vararg
     EXTRAARG(0, 0, OpArgU, OpArgU, iAx  ), // extra (larger) argument for previous opcode

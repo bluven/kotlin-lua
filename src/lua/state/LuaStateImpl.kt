@@ -207,13 +207,76 @@ class LuaStateImpl(val proto: Prototype) : LuaVM {
         }
     }
 
+    override fun newTable() {
+        createTable(0, 0)
+    }
+
+    override fun createTable(nArr: Int, nRec: Int) {
+        stack.push(LuaTable(nArr, nRec))
+    }
+
+    override fun getTable(idx: Int): LuaType {
+        val t = stack.get(idx)
+        val k = stack.pop()
+        return getTable(t, k)
+    }
+
+    override fun getField(idx: Int, k: String): LuaType {
+        val t = stack.get(idx)
+        return getTable(t, k)
+    }
+
+    override fun getI(idx: Int, i: Long): LuaType {
+        val t = stack.get(idx)
+        return getTable(t, i)
+    }
+
+    private fun getTable(t: Any?, k: Any?): LuaType {
+        if (t is LuaTable) {
+            val v = t[k]
+            stack.push(v)
+            return typeOf(v)
+        }
+        throw Exception("not a table!") // todo
+    }
+
+    /* set functions (stack -> Lua) */
+
+    override fun setTable(idx: Int) {
+        val t = stack.get(idx)
+        val v = stack.pop()
+        val k = stack.pop()
+        setTable(t, k, v)
+    }
+
+    override fun setField(idx: Int, k: String) {
+        val t = stack.get(idx)
+        val v = stack.pop()
+        setTable(t, k, v)
+    }
+
+    override fun setI(idx: Int, i: Long) {
+        val t = stack.get(idx)
+        val v = stack.pop()
+        setTable(t, i, v)
+    }
+
+    private fun setTable(t: Any?, k: Any?, v: Any?) {
+        if (t is LuaTable) {
+            t.put(k, v)
+            return
+        }
+        throw Exception("not a table!")
+    }
+
+
     override fun len(idx: Int) {
         val value = stack.get(idx)
 
-        if (value is String) {
-            pushInteger(value.length.toLong())
-        } else {
-            throw Exception("length error!")
+        when (value) {
+            is String -> pushInteger(value.length.toLong())
+            is LuaTable -> pushInteger(value.length().toLong())
+            else -> throw Exception("length error!")
         }
     }
 

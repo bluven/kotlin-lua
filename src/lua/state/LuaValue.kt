@@ -8,6 +8,7 @@ fun typeOf(value: Any?) = when (value) {
     is Boolean -> LUA_TBOOLEAN
     is Long, is Double -> LUA_TNUMBER
     is String -> LUA_TSTRING
+    is LuaTable -> LUA_TTABLE
     else -> throw Exception("Don't support ${value::class.simpleName}")
 }
 

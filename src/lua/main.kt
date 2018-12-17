@@ -1,9 +1,9 @@
 package lua
 
-import lua.debug.testBasicInstructions
+import lua.debug.testTable
 
 fun main(args: Array<String>) {
     if (args.isNotEmpty()) {
-        testBasicInstructions(args[0])
+        testTable(args[0])
     }
 }

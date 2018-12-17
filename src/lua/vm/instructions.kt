@@ -7,6 +7,9 @@ import lua.api.CmpOp
 import lua.api.CmpOp.*
 import lua.api.LuaType.*
 
+/* number of list items to accumulate before a SETLIST instruction */
+const val LFIELDS_PER_FLUSH = 50
+
 /* misc */
 
 // R(A) := R(B)
@@ -258,5 +261,69 @@ fun forLoop(i: Instruction, vm: LuaVM) {
         // pc+=sBx; R(A+3)=R(A)
         vm.addPC(sBx)
         vm.copy(a, a + 3)
+    }
+}
+
+/* table */
+
+private fun int2fb(x: Int): Int {
+    var x = x
+    var e = 0 /* exponent */
+    if (x < 8) {
+        return x
+    }
+    while (x >= 8 shl 4) { /* coarse steps */
+        x = x + 0xf shr 4 /* x = ceil(x / 16) */
+        e += 4
+    }
+    while (x >= 8 shl 1) { /* fine steps */
+        x = x + 1 shr 1 /* x = ceil(x / 2) */
+        e++
+    }
+    return e + 1 shl 3 or x - 8
+}
+
+/* converts back */
+private fun fb2int(x: Int): Int {
+    return if (x < 8) {
+        x
+    } else {
+        (x and 7) + 8 shl (x shr 3) - 1
+    }
+}
+
+// R(A) := {} (size = B,C)
+fun newTable(i: Instruction, vm: LuaVM) {
+    vm.createTable(fb2int(i.b), fb2int(i.c))
+    vm.replace(i.a + 1)
+}
+
+// R(A) := R(B)[RK(C)]
+fun getTable(i: Instruction, vm: LuaVM) {
+    vm.getRK(i.c)
+    vm.getTable(i.b + 1)
+    vm.replace(i.a + 1)
+}
+
+// R(A)[RK(B)] := RK(C)
+fun setTable(i: Instruction, vm: LuaVM) {
+    vm.getRK(i.b)
+    vm.getRK(i.c)
+    vm.setTable(i.a + 1)
+}
+
+// R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
+fun setList(i: Instruction, vm: LuaVM) {
+    val a = i.a + 1
+    val b = i.b
+    var c = i.c
+    c = if (c > 0) c - 1 else Instruction(vm.fetch()).ax
+
+    vm.checkStack(1)
+    var idx = c * LFIELDS_PER_FLUSH
+    for (j in 1..b) {
+        idx++
+        vm.pushValue(a + j)
+        vm.setI(a, idx.toLong())
     }
 }
