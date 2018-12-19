@@ -315,9 +315,15 @@ fun setTable(i: Instruction, vm: LuaVM) {
 // R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
 fun setList(i: Instruction, vm: LuaVM) {
     val a = i.a + 1
-    val b = i.b
+    var b = i.b
     var c = i.c
     c = if (c > 0) c - 1 else Instruction(vm.fetch()).ax
+
+    val bIsZero = b == 0
+    if (bIsZero) {
+        b = vm.toInteger(-1).toInt()  - a - 1
+        vm.pop(1)
+    }
 
     vm.checkStack(1)
     var idx = c * LFIELDS_PER_FLUSH
@@ -326,4 +332,124 @@ fun setList(i: Instruction, vm: LuaVM) {
         vm.pushValue(a + j)
         vm.setI(a, idx.toLong())
     }
+
+    if (bIsZero) {
+        for (j in vm.registerCount() + 1..vm.top) {
+            idx++
+            vm.pushValue(j)
+            vm.setI(a, idx.toLong())
+        }
+
+        // clear stack
+        vm.top = vm.registerCount()
+    }
 }
+
+// R(A+1) := R(B); R(A) := R(B)[RK(C)]
+fun _self(i: Instruction, vm: LuaVM) {
+    val a = i.a
+    val b = i.b + 1
+    val c = i.c
+
+    vm.copy(b, a + 1)
+    vm.getRK(c)
+    vm.getTable(b)
+    vm.replace(a)
+}
+
+// R(A) := closure(KPROTO[Bx])
+fun closure(i: Instruction, vm: LuaVM) {
+    vm.loadProto(i.bx)
+    vm.replace(i.a + 1)
+}
+
+// R(A), R(A+1), ..., R(A+B-2) = vararg
+fun vararg(i: Instruction, vm: LuaVM) {
+    val a = i.a + 1
+    val b = i.b
+
+    if (b != 1) { // b==0 or b>1
+        vm.loadVararg(b - 1)
+        popResults(a, b, vm)
+    }
+}
+
+// return R(A)(R(A+1), ... ,R(A+B-1))
+fun tailCall(i: Instruction, vm: LuaVM) {
+    val a = i.a + 1
+    val b = i.b
+    // todo: optimize tail call!
+    val c = 0
+    val nArgs = pushFuncAndArgs(a, b, vm)
+    vm.call(nArgs, c - 1)
+    popResults(a, c, vm)
+}
+
+// R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
+fun call(i: Instruction, vm: LuaVM) {
+    val a = i.a + 1
+    val b = i.b
+    val c = i.c
+    val nArgs = pushFuncAndArgs(a, b, vm)
+    vm.call(nArgs, c - 1)
+    popResults(a, c, vm)
+}
+
+// return R(A), ... ,R(A+B-2)
+fun _return(i: Instruction, vm: LuaVM) {
+    val a = i.a + 1
+    val b = i.b
+
+    when {
+        b == 1 -> {
+            // no return values
+        }
+        b > 1 -> {
+            // b-1 return values
+            vm.checkStack(b - 1)
+            for (j in a..a + b - 2) {
+                vm.pushValue(j)
+            }
+        }
+        else -> fixStack(a, vm)
+    }
+}
+
+private fun pushFuncAndArgs(a: Int, b: Int, vm: LuaVM): Int {
+    if (b >= 1) {
+        vm.checkStack(b)
+        for (i in a until a + b) {
+            vm.pushValue(i)
+        }
+        return b - 1
+    } else {
+        fixStack(a, vm)
+        return vm.top - vm.registerCount() - 1
+    }
+}
+
+private fun fixStack(a: Int, vm: LuaVM) {
+    val x = vm.toInteger(-1).toInt()
+    vm.pop(1)
+
+    vm.checkStack(x - a)
+    for (i in a until x) {
+        vm.pushValue(i)
+    }
+    vm.rotate(vm.registerCount() + 1, x - a)
+}
+
+private fun popResults(a: Int, c: Int, vm: LuaVM) {
+    if (c == 1) {
+        // no results
+    } else if (c > 1) {
+        for (i in a + c - 2 downTo a) {
+            vm.replace(i)
+        }
+    } else {
+        // leave results on stack
+        vm.checkStack(1)
+        vm.pushInteger(a.toLong())
+    }
+}
+

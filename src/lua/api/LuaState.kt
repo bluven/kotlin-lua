@@ -56,15 +56,23 @@ interface LuaState {
     fun setField(idx: Int, k: String)
     fun setI(idx: Int, i: Long)
 
+    /* 'load' and 'call' functions (load and run Lua code) */
+    fun load(chunk: ByteArray, chunkName: String, mode: String): ThreadStatus
+
+    fun call(nArgs: Int, nResults: Int)
+
     /* miscellaneous functions */
     fun len(idx: Int)
     fun concat(n: Int)
 }
 
 interface LuaVM: LuaState {
-    fun getPC(): Int
     fun addPC(n: Int)
     fun fetch(): Int
     fun getConst(idx: Int)
     fun getRK(rk: Int)
+
+    fun registerCount(): Int
+    fun loadVararg(n: Int)
+    fun loadProto(idx: Int)
 }

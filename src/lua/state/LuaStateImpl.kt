@@ -7,12 +7,25 @@ import lua.api.CmpOp
 import lua.api.CmpOp.*
 import lua.api.LuaType
 import lua.api.LuaType.*
+import lua.api.ThreadStatus
 import lua.binchunk.Prototype
+import lua.binchunk.undump
+import lua.vm.Instruction
 
-class LuaStateImpl(val proto: Prototype) : LuaVM {
+class LuaStateImpl() : LuaVM {
 
-    private val stack = LuaStack()
-    private var pc = 0
+    private var stack = LuaStack()
+
+    private fun pushLuaStack(newTop: LuaStack) {
+        newTop.prev = this.stack
+        this.stack = newTop
+    }
+
+    private fun popLuaStack() {
+        val top = this.stack
+        this.stack = top.prev!!
+        top.prev = null
+    }
 
     /* basic stack manipulation */
 
@@ -21,7 +34,7 @@ class LuaStateImpl(val proto: Prototype) : LuaVM {
         set(idx) {
             val newTop = stack.absIndex(idx)
             if (newTop < 0) {
-                throw RuntimeException("stack underflow!")
+                throw Exception("stack underflow!")
             }
 
             val n = stack.top - newTop
@@ -269,6 +282,64 @@ class LuaStateImpl(val proto: Prototype) : LuaVM {
         throw Exception("not a table!")
     }
 
+    /* 'load' and 'call' functions */
+
+    override fun load(chunk: ByteArray, chunkName: String, mode: String): ThreadStatus {
+        stack.push(Closure(undump(chunk)))
+        return ThreadStatus.LUA_OK
+    }
+
+    override fun call(nArgs: Int, nResults: Int) {
+        val value = stack.get(-(nArgs + 1))
+        if (value is Closure) {
+            println("call ${value.proto.source}<${value.proto.lineDefined},${value.proto.lastLineDefined}>")
+            callLuaClosure(nArgs, nResults, value)
+        } else {
+            throw Exception("not function!")
+        }
+    }
+
+    private fun callLuaClosure(nArgs: Int, nResults: Int, c: Closure) {
+        val nRegs = c.proto.maxStackSize
+        val nParams = c.proto.numParams
+        val isVararg = c.proto.isVararg.toInt() == 1
+
+        // create new lua stack
+        val newStack = LuaStack(/*nRegs + 20*/)
+        newStack.closure = c
+
+        // pass args, pop func
+        val funcAndArgs = stack.popN(nArgs + 1)
+        newStack.pushN(funcAndArgs.subList(1, funcAndArgs.size), nParams.toInt())
+        if (nArgs > nParams && isVararg) {
+            newStack.varargs = funcAndArgs.subList(nParams + 1, funcAndArgs.size)
+        }
+
+        // run closure
+        pushLuaStack(newStack)
+        top = nRegs.toInt()
+        runLuaClosure()
+        popLuaStack()
+
+        // return results
+        if (nResults != 0) {
+            val results = newStack.popN(newStack.top - nRegs)
+            //stack.check(results.size())
+            stack.pushN(results, nResults)
+        }
+    }
+
+    private fun runLuaClosure() {
+        while (true) {
+            val i = Instruction(fetch())
+
+            i.execute(this)
+
+            if (i.isReturn) {
+                break
+            }
+        }
+    }
 
     override fun len(idx: Int) {
         val value = stack.get(idx)
@@ -300,21 +371,19 @@ class LuaStateImpl(val proto: Prototype) : LuaVM {
         // n == 1, do nothing
     }
 
-    /* LuaVM */
-    override fun getPC(): Int {
-        return pc
-    }
-
     override fun addPC(n: Int) {
-        pc += n
+        stack.pc += n
     }
 
     override fun fetch(): Int {
-        return proto.code[pc++]
+        val i = stack.closure!!.proto.code[stack.pc]
+        stack.pc += 1
+
+        return i
     }
 
     override fun getConst(idx: Int) {
-        stack.push(proto.constants[idx])
+        stack.push(stack.closure!!.proto.constants[idx])
     }
 
     override fun getRK(rk: Int) {
@@ -325,4 +394,19 @@ class LuaStateImpl(val proto: Prototype) : LuaVM {
         }
     }
 
+    override fun registerCount(): Int {
+        return stack.closure!!.proto.maxStackSize.toInt()
+    }
+
+    override fun loadVararg(n: Int) {
+        val varargs = if (stack.varargs != null) stack.varargs!! else emptyList()
+        val n = if (n < 0) varargs.size else n
+
+        stack.pushN(varargs, n)
+    }
+
+    override fun loadProto(idx: Int) {
+        val proto = stack.closure!!.proto.protos[idx]
+        stack.push(Closure(proto))
+    }
 }

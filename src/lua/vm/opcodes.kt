@@ -26,7 +26,10 @@ enum class OpCode(
     val argBMode: OpArgMask,
     val argCMode: OpArgMask,
     val opMode: OpMode,
-    val action: OpAction? = null) {
+    val action: OpAction = {
+            _, _ ->
+        println("not implemented action")
+    }) {
 
     /*       T  A    B       C     mode */
     MOVE    (0, 1, OpArgR, OpArgN, iABC, ::move), // R(A) := R(B)
@@ -41,7 +44,7 @@ enum class OpCode(
     SETUPVAL(0, 0, OpArgU, OpArgN, iABC ), // UpValue[B] := R(A)
     SETTABLE(0, 0, OpArgK, OpArgK, iABC, ::setTable), // R(A)[RK(B)] := RK(C)
     NEWTABLE(0, 1, OpArgU, OpArgU, iABC, ::newTable), // R(A) := {} (size = B,C)
-    SELF    (0, 1, OpArgR, OpArgK, iABC ), // R(A+1) := R(B); R(A) := R(B)[RK(C)]
+    SELF    (0, 1, OpArgR, OpArgK, iABC, ::_self), // R(A+1) := R(B); R(A) := R(B)[RK(C)]
     ADD     (0, 1, OpArgK, OpArgK, iABC, ::add), // R(A) := RK(B) + RK(C)
     SUB     (0, 1, OpArgK, OpArgK, iABC, ::sub), // R(A) := RK(B) - RK(C)
     MUL     (0, 1, OpArgK, OpArgK, iABC, ::mul), // R(A) := RK(B) * RK(C)
@@ -65,16 +68,16 @@ enum class OpCode(
     LE      (1, 0, OpArgK, OpArgK, iABC, ::le), // if ((RK(B) <= RK(C)) ~= A) then pc++
     TEST    (1, 0, OpArgN, OpArgU, iABC, ::test ), // if not (R(A) <=> C) then pc++
     TESTSET (1, 1, OpArgR, OpArgU, iABC, ::testSet ), // if (R(B) <=> C) then R(A) := R(B) else pc++
-    CALL    (0, 1, OpArgU, OpArgU, iABC), // R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
-    TAILCALL(0, 1, OpArgU, OpArgU, iABC ), // return R(A)(R(A+1), ... ,R(A+B-1))
-    RETURN  (0, 0, OpArgU, OpArgN, iABC ), // return R(A), ... ,R(A+B-2)
+    CALL    (0, 1, OpArgU, OpArgU, iABC, ::call), // R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
+    TAILCALL(0, 1, OpArgU, OpArgU, iABC, ::tailCall), // return R(A)(R(A+1), ... ,R(A+B-1))
+    RETURN  (0, 0, OpArgU, OpArgN, iABC, ::_return), // return R(A), ... ,R(A+B-2)
     FORLOOP (0, 1, OpArgR, OpArgN, iAsBx, ::forLoop), // R(A)+=R(A+2); if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }
     FORPREP (0, 1, OpArgR, OpArgN, iAsBx, ::forPrep), // R(A)-=R(A+2); pc+=sBx
     TFORCALL(0, 0, OpArgN, OpArgU, iABC ), // R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2));
     TFORLOOP(0, 1, OpArgR, OpArgN, iAsBx), // if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }
     SETLIST (0, 0, OpArgU, OpArgU, iABC, ::setList), // R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
-    CLOSURE (0, 1, OpArgU, OpArgN, iABx ), // R(A) := closure(KPROTO[Bx])
-    VARARG  (0, 1, OpArgU, OpArgN, iABC ), // R(A), R(A+1), ..., R(A+B-2) = vararg
-    EXTRAARG(0, 0, OpArgU, OpArgU, iAx  ), // extra (larger) argument for previous opcode
+    CLOSURE (0, 1, OpArgU, OpArgN, iABx, ::closure), // R(A) := closure(KPROTO[Bx])
+    VARARG  (0, 1, OpArgU, OpArgN, iABC, ::vararg), // R(A), R(A+1), ..., R(A+B-2) = vararg
+    EXTRAARG(0, 0, OpArgU, OpArgU, iAx), // extra (larger) argument for previous opcode
     ;
 }

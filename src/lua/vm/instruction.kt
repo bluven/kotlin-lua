@@ -1,5 +1,7 @@
 package lua.vm
 
+import lua.api.LuaVM
+
 /*
  31       22       13       5    0
   +-------+^------+-^-----+-^-----
@@ -32,4 +34,11 @@ class Instruction(content: Int) {
     val sBx = bx - MAXARG_sBx
 
     val ax = content.ushr(6)
+
+    val isReturn = opCode === OpCode.RETURN
+
+    fun execute(vm: LuaVM) {
+        opCode.action(this, vm)
+    }
+
 }
