@@ -1,17 +1,23 @@
 package lua.state
 
+import lua.api.KFunction
+import lua.api.LUA_REGISTRYINDEX
+import lua.api.LuaState
 import lua.binchunk.Prototype
 import java.util.*
 
-internal class Closure(val proto: Prototype)
+internal data class Closure(
+    val proto: Prototype? = null,
+    val kFunc: KFunction? = null
+)
 
 
 internal class LuaStack {
     val slots = ArrayList<Any?>()
-
     val top: Int
         inline get() = slots.size
 
+    var state: LuaStateImpl? = null
     var closure: Closure? = null
     var varargs: List<Any?>? = null
     var pc: Int = 0
@@ -46,11 +52,20 @@ internal class LuaStack {
         return vals.reversed()
     }
 
-    fun absIndex(idx: Int) = if (idx >= 0) idx else idx + top + 1
+    fun absIndex(idx: Int) = when {
+        idx <= LUA_REGISTRYINDEX -> idx
+        idx >= 0 -> idx
+        else -> idx + top + 1
+    }
 
-    fun isValid(idx: Int) = absIndex(idx) in 1..top
+    fun isValid(idx: Int) = idx == LUA_REGISTRYINDEX || absIndex(idx) in 1..top
 
     fun get(idx: Int): Any? {
+
+        if (idx == LUA_REGISTRYINDEX) {
+            return state!!.registry
+        }
+
         val absIdx = absIndex(idx)
 
         return if (isValid(idx)) {
@@ -61,6 +76,10 @@ internal class LuaStack {
     }
 
     fun set(idx: Int, value: Any?) {
+        if (idx == LUA_REGISTRYINDEX) {
+            state!!.registry = value as LuaTable
+        }
+
         val absIdx = absIndex(idx)
 
         if (isValid(idx)) {

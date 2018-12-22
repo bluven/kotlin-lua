@@ -3,7 +3,6 @@ package lua.state
 import lua.number.isInteger
 import java.util.*
 
-
 internal class LuaTable(nArr: Int, nRec: Int) {
 
     private var arr: MutableList<Any?>? = null

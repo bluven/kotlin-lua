@@ -1,5 +1,10 @@
 package lua.api
 
+const val LUA_MINSTACK: Int = 20
+const val LUAI_MAXSTACK: Int = 1000000
+const val LUA_REGISTRYINDEX: Int = -LUAI_MAXSTACK - 1000
+const val LUA_RIDX_GLOBALS: Long = 2
+
 enum class LuaType {
     LUA_TNIL          ,
     LUA_TBOOLEAN      ,

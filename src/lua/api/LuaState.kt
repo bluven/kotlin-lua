@@ -1,5 +1,6 @@
 package lua.api
 
+
 interface LuaState {
     /* basic stack manipulation */
     var top: Int
@@ -27,12 +28,15 @@ interface LuaState {
     fun isTable(idx: Int): Boolean
     fun isThread(idx: Int): Boolean
     fun isFunction(idx: Int): Boolean
+    fun isKFunction(idx: Int): Boolean
+
     fun toBoolean(idx: Int): Boolean
     fun toInteger(idx: Int): Long
     fun toIntegerX(idx: Int): Long?
     fun toNumber(idx: Int): Double
     fun toNumberX(idx: Int): Double?
     fun toString(idx: Int): String?
+    fun toKFunction(idx: Int): KFunction?
 
     /* push functions (Go -> stack); */
     fun pushNil()
@@ -40,6 +44,8 @@ interface LuaState {
     fun pushInteger(n: Long)
     fun pushNumber(n: Double)
     fun pushString(s: String)
+    fun pushKFunction(f: KFunction)
+    fun pushGlobalTable()
 
     fun arith(op: ArithOp)
     fun compare(idx1: Int, idx2: Int, op: CmpOp): Boolean
@@ -50,11 +56,15 @@ interface LuaState {
     fun getTable(idx: Int): LuaType
     fun getField(idx: Int, k: String): LuaType
     fun getI(idx: Int, i: Long): LuaType
+    fun getGlobal(name: String): LuaType
 
     /* set functions (stack -> Lua) */
     fun setTable(idx: Int)
     fun setField(idx: Int, k: String)
     fun setI(idx: Int, i: Long)
+    fun setGlobal(name: String)
+
+    fun register(name: String, f: KFunction)
 
     /* 'load' and 'call' functions (load and run Lua code) */
     fun load(chunk: ByteArray, chunkName: String, mode: String): ThreadStatus
@@ -76,3 +86,5 @@ interface LuaVM: LuaState {
     fun loadVararg(n: Int)
     fun loadProto(idx: Int)
 }
+
+typealias KFunction = (LuaState) -> Int

@@ -38,7 +38,7 @@ enum class OpCode(
     LOADBOOL(0, 1, OpArgU, OpArgU, iABC, ::loadBool), // R(A) := (bool)B; if (C) pc++
     LOADNIL (0, 1, OpArgU, OpArgN, iABC, ::loadNil), // R(A), R(A+1), ..., R(A+B) := nil
     GETUPVAL(0, 1, OpArgU, OpArgN, iABC), // R(A) := UpValue[B]
-    GETTABUP(0, 1, OpArgU, OpArgK, iABC), // R(A) := UpValue[B][RK(C)]
+    GETTABUP(0, 1, OpArgU, OpArgK, iABC, ::getTabUp), // R(A) := UpValue[B][RK(C)]
     GETTABLE(0, 1, OpArgR, OpArgK, iABC, ::getTable), // R(A) := R(B)[RK(C)]
     SETTABUP(0, 0, OpArgK, OpArgK, iABC ), // UpValue[A][RK(B)] := RK(C)
     SETUPVAL(0, 0, OpArgU, OpArgN, iABC ), // UpValue[B] := R(A)

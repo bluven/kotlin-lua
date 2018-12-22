@@ -1,20 +1,25 @@
 package lua.state
 
-import lua.api.LuaVM
-import lua.api.ArithOp
+import lua.api.*
 import lua.api.ArithOp.*
-import lua.api.CmpOp
 import lua.api.CmpOp.*
-import lua.api.LuaType
 import lua.api.LuaType.*
-import lua.api.ThreadStatus
-import lua.binchunk.Prototype
 import lua.binchunk.undump
 import lua.vm.Instruction
 
-class LuaStateImpl() : LuaVM {
+class LuaStateImpl: LuaVM {
 
+    internal var registry = LuaTable(0, 0)
     private var stack = LuaStack()
+
+    init {
+        registry.put(LUA_RIDX_GLOBALS, LuaTable(0, 0))
+
+        val stack = LuaStack()
+        stack.state = this
+
+        pushLuaStack(stack)
+    }
 
     private fun pushLuaStack(newTop: LuaStack) {
         newTop.prev = this.stack
@@ -136,6 +141,11 @@ class LuaStateImpl() : LuaVM {
 
     override fun isFunction(idx: Int) = type(idx) === LUA_TFUNCTION
 
+    override fun isKFunction(idx: Int): Boolean {
+        val value = stack.get(idx)
+        return value is Closure && value.kFunc != null
+    }
+
     override fun toBoolean(idx: Int) = toBoolean(stack.get(idx))
 
     override fun toInteger(idx: Int) = toIntegerX(idx) ?: 0
@@ -167,6 +177,12 @@ class LuaStateImpl() : LuaVM {
         }
     }
 
+    override fun toKFunction(idx: Int): KFunction? {
+        val value = stack.get(idx)
+
+        return if (value is Closure) value.kFunc else null
+    }
+
     /* push functions (Go -> stack); */
 
     override fun pushNil() {
@@ -187,6 +203,14 @@ class LuaStateImpl() : LuaVM {
 
     override fun pushString(s: String) {
         stack.push(s)
+    }
+
+    override fun pushKFunction(f: KFunction) {
+        stack.push(Closure(kFunc = f))
+    }
+
+    override fun pushGlobalTable() {
+        stack.push(registry[LUA_RIDX_GLOBALS])
     }
 
     override fun arith(op: ArithOp) {
@@ -253,7 +277,11 @@ class LuaStateImpl() : LuaVM {
         throw Exception("not a table!") // todo
     }
 
-    /* set functions (stack -> Lua) */
+    override fun getGlobal(name: String) = getTable(registry.get(LUA_RIDX_GLOBALS), name)
+
+    override fun setGlobal(name: String) {
+        setTable(registry[LUA_RIDX_GLOBALS], name, stack.pop())
+    }
 
     override fun setTable(idx: Int) {
         val t = stack.get(idx)
@@ -282,6 +310,10 @@ class LuaStateImpl() : LuaVM {
         throw Exception("not a table!")
     }
 
+    override fun register(name: String, f: KFunction) {
+        pushKFunction(f)
+        setGlobal(name)
+    }
     /* 'load' and 'call' functions */
 
     override fun load(chunk: ByteArray, chunkName: String, mode: String): ThreadStatus {
@@ -292,17 +324,47 @@ class LuaStateImpl() : LuaVM {
     override fun call(nArgs: Int, nResults: Int) {
         val value = stack.get(-(nArgs + 1))
         if (value is Closure) {
-            println("call ${value.proto.source}<${value.proto.lineDefined},${value.proto.lastLineDefined}>")
-            callLuaClosure(nArgs, nResults, value)
+            if(value.proto != null) {
+                callLuaClosure(nArgs, nResults, value)
+            } else {
+                callKotlinClosure(nArgs, nResults, value)
+            }
         } else {
             throw Exception("not function!")
         }
     }
 
+
+    private fun callKotlinClosure(nArgs: Int, nResults: Int, c: Closure) {
+        val newStack = LuaStack()
+        newStack.state = this
+        newStack.closure = c
+
+        // pass args, pop func
+        if (nArgs > 0) {
+            newStack.pushN(stack.popN(nArgs), nArgs)
+        }
+        stack.pop()
+
+        // run closure
+        pushLuaStack(newStack)
+        val r = c.kFunc!!(this)
+        popLuaStack()
+
+        // return results
+        if (nResults != 0) {
+            val results = newStack.popN(r)
+            //stack.check(results.size())
+            stack.pushN(results, nResults)
+        }
+    }
+
     private fun callLuaClosure(nArgs: Int, nResults: Int, c: Closure) {
-        val nRegs = c.proto.maxStackSize
-        val nParams = c.proto.numParams
-        val isVararg = c.proto.isVararg.toInt() == 1
+        val proto = c.proto!!
+
+        val nRegs = proto.maxStackSize
+        val nParams = proto.numParams
+        val isVararg = proto.isVararg.toInt() == 1
 
         // create new lua stack
         val newStack = LuaStack(/*nRegs + 20*/)
@@ -376,14 +438,14 @@ class LuaStateImpl() : LuaVM {
     }
 
     override fun fetch(): Int {
-        val i = stack.closure!!.proto.code[stack.pc]
+        val i = stack.closure!!.proto!!.code[stack.pc]
         stack.pc += 1
 
         return i
     }
 
     override fun getConst(idx: Int) {
-        stack.push(stack.closure!!.proto.constants[idx])
+        stack.push(stack.closure!!.proto!!.constants[idx])
     }
 
     override fun getRK(rk: Int) {
@@ -395,7 +457,7 @@ class LuaStateImpl() : LuaVM {
     }
 
     override fun registerCount(): Int {
-        return stack.closure!!.proto.maxStackSize.toInt()
+        return stack.closure!!.proto!!.maxStackSize.toInt()
     }
 
     override fun loadVararg(n: Int) {
@@ -406,7 +468,7 @@ class LuaStateImpl() : LuaVM {
     }
 
     override fun loadProto(idx: Int) {
-        val proto = stack.closure!!.proto.protos[idx]
+        val proto = stack.closure!!.proto!!.protos[idx]
         stack.push(Closure(proto))
     }
 }

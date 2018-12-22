@@ -453,3 +453,17 @@ private fun popResults(a: Int, c: Int, vm: LuaVM) {
     }
 }
 
+
+/* upvalues */
+
+// R(A) := UpValue[B][RK(C)]
+fun getTabUp(i: Instruction, vm: LuaVM) {
+    val a = i.a + 1
+    val c = i.c
+
+    vm.pushGlobalTable()
+    vm.getRK(c)
+    vm.getTable(-2)
+    vm.replace(a)
+    vm.pop(1)
+}
